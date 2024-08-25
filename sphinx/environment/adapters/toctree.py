@@ -205,6 +205,7 @@ def _entries_from_toctree(
     toctreenode: addnodes.toctree,
     parents: list[str],
     subtree: bool = False,
+    **kwargs
 ) -> list[Element]:
     """Return TOC entries for a toctree node."""
     entries: list[Element] = []
@@ -212,7 +213,7 @@ def _entries_from_toctree(
         try:
             toc, refdoc = _toctree_entry(
                 title, ref, env, prune, collapse, tags, toctree_ancestors,
-                included, excluded, toctreenode, parents,
+                included, excluded, toctreenode, parents, description, image, **kwargs
             )
         except LookupError:
             continue
@@ -281,17 +282,20 @@ def _toctree_entry(
     excluded: Matcher,
     toctreenode: addnodes.toctree,
     parents: list[str],
+    description: str,
+    image: str,
+    **kwargs
 ) -> tuple[Element, str]:
     from sphinx.domains.std import StandardDomain
 
     try:
         refdoc = ''
         if url_re.match(ref):
-            toc = _toctree_url_entry(title, ref)
+            toc = _toctree_url_entry(title, ref, description, image, **kwargs)
         elif ref == 'self':
-            toc = _toctree_self_entry(title, toctreenode['parent'], env.titles)
+            toc = _toctree_self_entry(title, toctreenode['parent'], env.titles, description, image, **kwargs)
         elif ref in StandardDomain._virtual_doc_names:
-            toc = _toctree_generated_entry(title, ref)
+            toc = _toctree_generated_entry(title, ref, description, image, **kwargs)
         else:
             if ref in parents:
                 logger.warning(__('circular toctree references '
@@ -310,6 +314,9 @@ def _toctree_entry(
                 prune,
                 collapse,
                 tags,
+                description,
+                image,
+                **kwargs
             )
 
         if not toc.children:
@@ -332,7 +339,7 @@ def _toctree_entry(
     return toc, refdoc
 
 
-def _toctree_url_entry(title: str, ref: str) -> nodes.bullet_list:
+def _toctree_url_entry(title: str, ref: str, description: str, image: str, **kwargs) -> nodes.bullet_list:
     if title is None:
         title = ref
     reference = nodes.reference('', '', internal=False,
@@ -345,7 +352,7 @@ def _toctree_url_entry(title: str, ref: str) -> nodes.bullet_list:
 
 
 def _toctree_self_entry(
-    title: str, ref: str, titles: dict[str, nodes.title],
+    title: str, ref: str, titles: dict[str, nodes.title], description: str, image: str, **kwargs
 ) -> nodes.bullet_list:
     # 'self' refers to the document from which this
     # toctree originates
@@ -362,7 +369,13 @@ def _toctree_self_entry(
     return toc
 
 
-def _toctree_generated_entry(title: str, ref: str) -> nodes.bullet_list:
+def _toctree_generated_entry(
+        title: str,
+        ref: str,
+        description: str,
+        image: str,
+        **kwargs
+) -> nodes.bullet_list:
     from sphinx.domains.std import StandardDomain
 
     docname, sectionname = StandardDomain._virtual_doc_names[ref]
@@ -380,6 +393,8 @@ def _toctree_generated_entry(title: str, ref: str) -> nodes.bullet_list:
 def _toctree_standard_entry(
     title: str,
     ref: str,
+    description: str,
+    image: str,
     maxdepth: int,
     toc: nodes.bullet_list,
     toctree_ancestors: Set[str],
