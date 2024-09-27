@@ -210,10 +210,17 @@ def _entries_from_toctree(
     """Return TOC entries for a toctree node."""
     entries: list[Element] = []
     for (title, ref) in toctreenode['entries']:
+        # Extract description and image from the toctree node options
+        descriptions = toctreenode.get('descriptions', {})
+        images = toctreenode.get('images', {})
+        description = descriptions.get(ref, '')
+        image = images.get(ref, '')
+
         try:
             toc, refdoc = _toctree_entry(
                 title, ref, env, prune, collapse, tags, toctree_ancestors,
-                included, excluded, toctreenode, parents, description, image, **kwargs
+                included, excluded, toctreenode, parents,
+                description=description, image=image, **kwargs
             )
         except LookupError:
             continue
@@ -340,12 +347,23 @@ def _toctree_entry(
 
 
 def _toctree_url_entry(title: str, ref: str, description: str, image: str, **kwargs) -> nodes.bullet_list:
-    if title is None:
+    if not title:
         title = ref
     reference = nodes.reference('', '', internal=False,
                                 refuri=ref, anchorname='',
                                 *[nodes.Text(title)])
     para = addnodes.compact_paragraph('', '', reference)
+
+    # Add description if provided
+    if description:
+        desc_node = nodes.paragraph('', '', nodes.Text(description))
+        para += desc_node
+
+    # Add image if provided
+    if image:
+        image_node = nodes.image(uri=image)
+        para += image_node
+
     item = nodes.list_item('', para)
     toc = nodes.bullet_list('', item)
     return toc
@@ -354,8 +372,7 @@ def _toctree_url_entry(title: str, ref: str, description: str, image: str, **kwa
 def _toctree_self_entry(
     title: str, ref: str, titles: dict[str, nodes.title], description: str, image: str, **kwargs
 ) -> nodes.bullet_list:
-    # 'self' refers to the document from which this
-    # toctree originates
+    # 'self' refers to the document from which this toctree originates
     if not title:
         title = clean_astext(titles[ref])
     reference = nodes.reference('', '', internal=True,
@@ -363,8 +380,18 @@ def _toctree_self_entry(
                                 anchorname='',
                                 *[nodes.Text(title)])
     para = addnodes.compact_paragraph('', '', reference)
+
+    # Add description if provided
+    if description:
+        desc_node = nodes.paragraph('', '', nodes.Text(description))
+        para += desc_node
+
+    # Add image if provided
+    if image:
+        image_node = nodes.image(uri=image)
+        para += image_node
+
     item = nodes.list_item('', para)
-    # don't show subitems
     toc = nodes.bullet_list('', item)
     return toc
 
@@ -381,11 +408,22 @@ def _toctree_generated_entry(
     docname, sectionname = StandardDomain._virtual_doc_names[ref]
     if not title:
         title = sectionname
-    reference = nodes.reference('', title, internal=True,
-                                refuri=docname, anchorname='')
+    reference = nodes.reference('', '', internal=True,
+                                refuri=docname, anchorname='',
+                                *[nodes.Text(title)])
     para = addnodes.compact_paragraph('', '', reference)
+
+    # Add description if provided
+    if description:
+        desc_node = nodes.paragraph('', '', nodes.Text(description))
+        para += desc_node
+
+    # Add image if provided
+    if image:
+        image_node = nodes.image(uri=image)
+        para += image_node
+
     item = nodes.list_item('', para)
-    # don't show subitems
     toc = nodes.bullet_list('', item)
     return toc
 
@@ -393,20 +431,37 @@ def _toctree_generated_entry(
 def _toctree_standard_entry(
     title: str,
     ref: str,
-    description: str,
-    image: str,
     maxdepth: int,
     toc: nodes.bullet_list,
     toctree_ancestors: Set[str],
     prune: bool,
     collapse: bool,
     tags: Tags,
+    description: str,
+    image: str,
+    **kwargs
 ) -> tuple[nodes.bullet_list, str]:
     refdoc = ref
     if ref in toctree_ancestors and (not prune or maxdepth <= 0):
         toc = toc.deepcopy()
     else:
         toc = _toctree_copy(toc, 2, maxdepth, collapse, tags)
+
+    # Modify the toc to include description and image
+    if toc.children and len(toc.children) == 1:
+        list_item = toc.children[0]
+        if isinstance(list_item, nodes.list_item):
+            para = list_item.children[0]
+            if isinstance(para, addnodes.compact_paragraph):
+                # Add description if provided
+                if description:
+                    desc_node = nodes.paragraph('', '', nodes.Text(description))
+                    para += desc_node
+
+                # Add image if provided
+                if image:
+                    image_node = nodes.image(uri=image)
+                    para += image_node
 
     if title and toc.children and len(toc.children) == 1:
         child = toc.children[0]
@@ -534,3 +589,4 @@ class TocTree:
         self, docname: str, builder: Builder, collapse: bool, **kwargs: Any,
     ) -> Element | None:
         return global_toctree_for_doc(self.env, docname, builder, collapse=collapse, **kwargs)
+
